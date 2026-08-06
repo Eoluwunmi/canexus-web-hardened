@@ -1,0 +1,114 @@
+# Security & Privacy — CANexus MVP
+
+This document tracks the infrastructure- and hosting-level requirements from Volume 8 (Security
+& Privacy) of the CANexus Product & Technical Blueprint that are **outside this repository's
+control** — i.e., things a hosting/deployment decision has to satisfy, not something application
+code can enforce on its own. For the application-layer controls (audit logging, consent, access/
+correction/erasure, MFA), see the code in `src/lib/audit.ts`, `src/actions/consent.ts`,
+`src/actions/account.ts`, and `src/actions/mfa.ts`.
+
+> **This checklist does not replace formal review by Canadian privacy counsel before launch.**
+> It is an engineering-facing checklist for aligning infrastructure choices with PIPEDA and
+> applicable provincial statutes (Quebec Law 25, Alberta PIPA, BC PIPA); it is not a legal
+> opinion, and several items below explicitly need counsel sign-off.
+
+## 1. Data residency
+
+**Requirement:** personal data must be stored and processed on Canadian-region infrastructure by
+default. Any exception (e.g. a sub-processor or CDN with a non-Canadian region) must be
+explicitly disclosed to users, typically via the privacy policy.
+
+Before launch, verify:
+- [ ] Database hosting region is Canada (e.g. AWS `ca-central-1`, Azure `Canada Central`/`Canada
+      East`, GCP `northamerica-northeast1`/`northamerica-northeast2`, or a managed Postgres
+      provider's Canadian region).
+- [ ] Object storage for Passport evidence files (`src/lib/storage.ts` — implemented as of the
+      evidence-file-upload feature) is provisioned in a Canadian region.
+- [ ] Any third-party sub-processor (email delivery, error tracking, analytics, the Anthropic API
+      used by the AI Coach) is inventoried, and its data-residency posture is documented in the
+      privacy policy. **This needs privacy-counsel review** — data residency exceptions for
+      sub-processors are a legal disclosure question, not just a technical one.
+- [ ] `NEXTAUTH_URL` / deployment domain and any CDN edge caching are reviewed for where request/
+      response data actually transits and is cached.
+
+## 2. Transport encryption (TLS)
+
+**Requirement:** TLS 1.2+ for all client-service and service-database connections.
+
+- [x] **Database connection**: `src/db/index.ts` now sets `ssl: "require"` on the Postgres client
+      whenever `NODE_ENV === "production"`, rather than relying solely on `sslmode=require` being
+      present in `DATABASE_URL` (easy to omit by accident). Confirm the production
+      `DATABASE_URL`'s host actually offers a TLS listener — most managed Postgres providers do
+      by default, but self-hosted Postgres needs this configured explicitly on the server side
+      too.
+- [ ] **Client-service**: confirm the hosting platform terminates TLS 1.2+ for all inbound
+      traffic (this is typically automatic on platforms like Vercel, but must be verified for any
+      self-hosted or custom-domain deployment) and that HTTP→HTTPS redirect is enforced.
+- [ ] Confirm no internal service-to-service call (e.g. to the Anthropic API in
+      `src/lib/coach.ts`) is ever made over plain HTTP — the current `fetch()` call already uses
+      `https://api.anthropic.com`, but this is worth re-checking if that integration changes.
+
+## 3. Encryption at rest
+
+**Requirement:** encryption at rest for the database and for object storage (evidence files).
+This is a hosting-provider configuration responsibility, not something this codebase can enforce
+directly.
+
+Before launch, verify and document:
+- [ ] Managed Postgres provider's encryption-at-rest setting is enabled (most managed providers —
+      RDS, Cloud SQL, Azure Database for PostgreSQL, Supabase, Neon — enable this by default, but
+      confirm explicitly and record the provider's documentation reference here).
+- [ ] Object storage bucket/container (see section 4 below for evidence-file-specific detail)
+      has server-side encryption enabled by default.
+- [ ] Backups/snapshots of the above inherit the same encryption-at-rest guarantee.
+
+## 4. Evidence file storage (Passport evidence attachments)
+
+Covers the object storage used by `src/lib/storage.ts` / `src/actions/evidence.ts` for
+Skills Passport evidence file attachments.
+
+- [ ] **Bucket region**: must be a Canadian region by default (`S3_REGION` in `.env.example`
+      defaults to `ca-central-1`), same as the data-residency requirement in section 1 above —
+      evidence files are personal data. Confirm the actual bucket, not just the env default, is
+      provisioned in-region.
+- [ ] **Encryption at rest**: enable server-side encryption (SSE) on the bucket. Most providers
+      (S3, R2, B2) support this as a bucket-level default; confirm it's turned on rather than
+      left as the provider's un-encrypted default.
+- [x] **Objects are private**: uploads and downloads both go through short-lived presigned URLs
+      (5-minute expiry) generated by `src/lib/storage.ts` — there is no public-read bucket policy
+      or public object ACL anywhere in this implementation. Confirm the bucket's default ACL /
+      public-access-block settings also enforce this at the infrastructure level as a second
+      layer (defense in depth — the application code assuming privacy isn't a substitute for the
+      bucket itself blocking public access).
+- [ ] **Malware scanning is NOT implemented.** Uploaded files are validated for extension,
+      declared MIME type, and size (both client-declared, at request time, and re-verified
+      against S3's own `HeadObject` response after upload) — but nothing scans file *content* for
+      malicious payloads (e.g. a PDF with an embedded exploit, or a polyglot file). This is an
+      explicit open item, not a silent omission — before launch, this needs either a
+      provider-level scanning feature (e.g. an S3 event trigger to a scanning service) or an
+      equivalent added at the application layer.
+
+## 5. Field-level encryption — flagged gap
+
+- [ ] `userMfa.secret` (the TOTP shared secret, see `src/db/schema.ts`) is currently stored in
+      plaintext in the database. This codebase has no field-level encryption utility yet. **This
+      is a follow-up ticket**, not something addressed in this change — encrypting it depends on
+      choosing a key-management approach (KMS-backed envelope encryption, etc.) that's an
+      infrastructure decision as much as a code one.
+- [ ] MFA backup codes (`userMfa.backupCodes`) ARE bcrypt-hashed at the application layer (see
+      `src/lib/mfa.ts`), so this one doesn't need field-level encryption — hashing is the right
+      primitive for single-use codes that only need to be verified, not recovered.
+
+## 6. Other items worth tracking here
+
+- [ ] Rate-limiting / brute-force protection on `src/actions/mfa.ts`'s `checkMfaRequiredAction`
+      and on `src/auth.ts`'s credentials `authorize()` — neither has any lockout or throttling in
+      this MVP. Worth a follow-up ticket before launch.
+- [ ] Structured secrets management for `AUTH_SECRET`, `DATABASE_URL`, and `ANTHROPIC_API_KEY` in
+      the production environment (this repo only defines `.env.example`; actual secret storage is
+      a deployment-platform decision).
+
+---
+*Last updated as part of the Volume 8 privacy/security hardening pass. Update this file's
+checkboxes as each item is verified against the actual production hosting configuration — most
+of them can't be verified from inside this repository.*

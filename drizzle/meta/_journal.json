@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785963124087,
+      "tag": "0000_massive_sebastian_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785963398962,
+      "tag": "0001_add_user_consents",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785963658614,
+      "tag": "0002_access_correction_erasure",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785964082232,
+      "tag": "0003_mfa_and_employer_admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785990877900,
+      "tag": "0004_evidence_files",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785991433003,
+      "tag": "0005_opportunity_typing",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785991755208,
+      "tag": "0006_funding_incentives",
+      "breakpoints": true
+    }
+  ]
+}

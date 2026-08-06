@@ -1,0 +1,63 @@
+JEAN-PIERRE DUBOIS | جان پیر دوبوا
+Montreal, Quebec, Canada
+jp.dubois@example.com | +1 (514) 555-4567
+https://orcid.org/0000-0001-2345-6789
+
+PROFESSIONAL SUMMARY / RÉSUMÉ PROFESSIONNEL
+Research scientist with 8+ years of experience in environmental science and climate modeling. Bilingual (English/French). Seeking to transition to data science role in private sector while leveraging research and statistical expertise.
+
+EXPERIENCE
+
+Research Scientist, Climate Modeling
+Environment Canada, Montreal, QC
+January 2016 – Present
+• Led climate impact assessments for 5+ Canadian provinces
+• Published 12 peer-reviewed papers on temperature projections
+• Mentored 3 graduate students in research methodology
+• Developed Python tools for large-scale climate data analysis
+
+Postdoctoral Fellow
+University of Montreal, Montreal, QC
+September 2014 – December 2015
+• Conducted field research on ecosystem carbon cycling
+• Collaborated with international research consortium
+• Analyzed 10 years of observational data using R and statistical methods
+
+Research Assistant
+University of British Columbia, Vancouver, BC
+May 2012 – August 2014
+• Collected and processed environmental monitoring data
+• Assisted in publication of 6 peer-reviewed studies
+
+EDUCATION
+
+Ph.D. in Environmental Science
+University of Montreal, Montreal, QC
+2014
+Dissertation: "Long-term Climate Change Impacts on Boreal Forests"
+
+Master of Science in Environmental Studies
+University of British Columbia, Vancouver, BC
+2012
+
+Bachelor of Science in Biology
+Concordia University, Montreal, QC
+2010
+
+SKILLS
+Programming: R, Python, MATLAB, SQL, Python (NumPy, Pandas, SciPy)
+Data Visualization: ggplot2, Matplotlib, Tableau, ArcGIS
+Statistics: Regression Analysis, Machine Learning, Hypothesis Testing, Time Series Analysis
+Tools: Git, LaTeX, Jupyter Notebooks, Linux
+
+PUBLICATIONS (Selected)
+• Dubois, J.P., et al. (2023). "Climate projections for eastern Canada." Nature Climate Change, 13(5), 412-418.
+• Dubois, J.P., & Smith, A.B. (2022). "Ecosystem responses to temperature change." Global Ecology Letters, 29(3), 234-242.
+
+CERTIFICATIONS
+Professional Engineer in Training (PEt), Professional Engineers Ontario (2021)
+Data Science Specialization, Coursera (2022)
+
+LANGUAGES
+French (Native)
+English (Fluent)

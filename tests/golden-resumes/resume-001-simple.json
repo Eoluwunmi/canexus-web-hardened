@@ -1,0 +1,23 @@
+{
+  "name": "resume-001-simple",
+  "description": "Single-page, text-based resume from career changer",
+  "filePath": "resume-001-simple.txt",
+  "expectedFields": {
+    "identity.full_name": "Sarah Martinez",
+    "identity.emails[0]": "sarah.martinez@example.com",
+    "identity.phones[0].e164": "+16135551234",
+    "identity.location.city": "Ottawa",
+    "identity.location.region": "Ontario",
+    "experience[0].employer": "Acme Corp",
+    "experience[0].title": "Software Developer",
+    "experience[0].start": "2022-01",
+    "experience[0].end": "present",
+    "education[0].institution": "Carleton University",
+    "education[0].credential": "Bachelor of Science",
+    "education[0].field_of_study": "Computer Science",
+    "skills[0].name": "Python",
+    "skills[1].name": "JavaScript",
+    "languages[0].name": "English",
+    "languages[1].name": "Spanish"
+  }
+}

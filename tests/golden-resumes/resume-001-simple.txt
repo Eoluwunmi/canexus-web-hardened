@@ -1,0 +1,53 @@
+SARAH MARTINEZ
+Ottawa, Ontario, Canada
+sarah.martinez@example.com | +1 (613) 555-1234
+https://linkedin.com/in/sarah-martinez | https://github.com/smartinez
+
+PROFESSIONAL SUMMARY
+Software developer transitioning from automotive engineering to technology. Demonstrated ability to learn quickly and apply technical skills across domains. Seeking junior developer role to build career in web development.
+
+EXPERIENCE
+
+Software Developer
+Acme Corp, Toronto, ON
+January 2022 – Present
+• Developed and maintained REST APIs using Python and FastAPI
+• Built responsive web interfaces with JavaScript and React
+• Collaborated with cross-functional teams on product features
+• Improved application performance by 25% through optimization
+
+Quality Engineer
+AutoTech Solutions, Toronto, ON
+August 2019 – December 2021
+• Tested automotive software systems and documented defects
+• Created test automation scripts in Python
+• Mentored 2 junior team members on best practices
+• Reduced testing time by 40% through process improvements
+
+Assembly Line Technician
+MotorWorks Manufacturing, Hamilton, ON
+June 2018 – July 2019
+• Assembled and tested vehicle components
+• Troubleshot equipment issues
+• Maintained safety and quality standards
+• Trained new technicians on assembly procedures
+
+EDUCATION
+
+Bachelor of Science in Computer Science
+Carleton University, Ottawa, ON
+2018
+GPA: 3.7/4.0
+Relevant Coursework: Data Structures, Algorithms, Web Development, Databases
+
+SKILLS
+Technical: Python, JavaScript, React, SQL, PostgreSQL, REST APIs, Git, Linux, HTML/CSS
+Tools: VS Code, Docker, Postman, Jira, Confluence
+Soft Skills: Problem-solving, Communication, Team Collaboration, Adaptability
+
+LANGUAGES
+English (Native)
+Spanish (Conversational)
+
+CERTIFICATIONS
+AWS Certified Cloud Practitioner (2021)

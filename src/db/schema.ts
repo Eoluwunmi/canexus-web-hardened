@@ -279,3 +279,73 @@ export const fundingIncentives = pgTable("funding_incentives", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+/** Resume parser: uploaded resume files. One file per upload; hash-deduped at ingest time.
+ *  Original file is immutably stored in S3. */
+export const resumes = pgTable("resumes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  uploadedByUserId: uuid("uploaded_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileFormat: varchar("file_format", { length: 20 }).notNull(), // pdf, docx, txt, etc.
+  storageKey: text("storage_key").notNull().unique(), // S3 object key
+  fileSizeBytes: integer("file_size_bytes").notNull(),
+  fileHash: varchar("file_hash", { length: 64 }).notNull(), // SHA-256 for dedup
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+});
+
+/** Parse job status enum for async processing */
+export const parseStatusEnum = pgEnum("parse_status", [
+  "PENDING",      // Queued, not started
+  "EXTRACTING",   // Text extraction in progress
+  "EXTRACTED",    // Raw text ready
+  "PARSING",      // LLM extraction in progress
+  "COMPLETED",    // Parse successful
+  "FAILED",       // Parse failed
+  "NEEDS_REVIEW", // Completed but low confidence fields need human review
+]);
+
+/** Resume parse results. One per resume. Stores structured extracted data + confidence + provenance. */
+export const resumeParses = pgTable("resume_parses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  resumeId: uuid("resume_id").notNull().unique().references(() => resumes.id, { onDelete: "cascade" }),
+  status: parseStatusEnum("status").notNull().default("PENDING"),
+  // Raw extracted JSON matching the spec schema
+  extractedData: jsonb("extracted_data"), // Full parse result object
+  // Provenance: per-field locations in source document (for review UI highlighting)
+  provenance: jsonb("provenance"), // Array of { field_path, page, bbox, text_span }
+  // Quality metrics
+  overallConfidence: real("overall_confidence").default(0),
+  fieldConfidence: jsonb("field_confidence"), // { "identity.full_name": 0.98, ... }
+  needsReview: boolean("needs_review").notNull().default(false),
+  reviewReasons: text("review_reasons"), // Pipe-separated list of issues
+  // Error tracking
+  errorMessage: text("error_message"),
+  // Versioning
+  parsingVersion: varchar("parsing_version", { length: 50 }).default("1.0"), // For reproducibility
+  parsedAt: timestamp("parsed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/** User corrections to parsed data. Append-only, linked to resumeParse.
+ *  This becomes the labeled dataset for evaluation and future model tuning. */
+export const parseCorrections = pgTable("parse_corrections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  parseId: uuid("parse_id").notNull().references(() => resumeParses.id, { onDelete: "cascade" }),
+  correctedByUserId: uuid("corrected_by_user_id").notNull().references(() => users.id, { onDelete: "set null" }),
+  fieldPath: text("field_path").notNull(), // e.g., "identity.full_name", "experience[0].title"
+  originalValue: text("original_value"), // What the parser extracted
+  correctedValue: text("corrected_value").notNull(), // What the human provided
+  notes: text("notes"), // Why they corrected it
+  correctedAt: timestamp("corrected_at").defaultNow().notNull(),
+});
+
+/** Cost tracking for LLM + OCR per resume. For billing/reporting. */
+export const parseCosts = pgTable("parse_costs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  parseId: uuid("parse_id").notNull().unique().references(() => resumeParses.id, { onDelete: "cascade" }),
+  llmCostUsd: real("llm_cost_usd").default(0), // Claude API token cost
+  ocrCostUsd: real("ocr_cost_usd").default(0), // Tesseract or cloud OCR cost
+  totalCostUsd: real("total_cost_usd").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

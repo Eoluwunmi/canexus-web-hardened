@@ -1,0 +1,20 @@
+{
+  "name": "resume-002-bilingual",
+  "description": "Bilingual (EN/FR) academic CV with research experience, minimal employment gaps",
+  "filePath": "resume-002-bilingual.txt",
+  "expectedFields": {
+    "identity.full_name": "Jean-Pierre Dubois",
+    "identity.emails[0]": "jp.dubois@example.com",
+    "identity.location.city": "Montreal",
+    "identity.location.region": "Quebec",
+    "education[0].institution": "University of Montreal",
+    "education[0].credential": "Ph.D.",
+    "education[0].field_of_study": "Environmental Science",
+    "experience[0].employer": "Environment Canada",
+    "experience[0].title": "Research Scientist",
+    "skills[0].name": "R",
+    "skills[1].name": "Python",
+    "languages[0].name": "French",
+    "languages[1].name": "English"
+  }
+}

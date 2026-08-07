@@ -138,11 +138,25 @@ export async function POST(request: NextRequest) {
 
     // Create userSkillSource entries linking these skills to the discovery session
     for (const userSkillId of createdSkillIds) {
-      await db.insert(userSkillSources).values({
-        userSkillId,
-        sourceType: "DISCOVERED",
-        sourceId: sessionId,
-      });
+      try {
+        // Check if source already exists before inserting
+        const existingSource = await db
+          .select()
+          .from(userSkillSources)
+          .where(eq(userSkillSources.userSkillId, userSkillId))
+          .then((rows) => rows[0]);
+
+        if (!existingSource) {
+          await db.insert(userSkillSources).values({
+            userSkillId,
+            sourceType: "DISCOVERED",
+            sourceId: sessionId,
+          });
+        }
+      } catch (err) {
+        // Silently skip if source already exists
+        console.warn(`Source already exists for skill ${userSkillId}`);
+      }
     }
 
     // Mark discovery session as COMPLETED
@@ -156,9 +170,10 @@ export async function POST(request: NextRequest) {
 
     // Audit log
     await logAudit({
+      actorUserId: userSession.user.id,
       action: "DISCOVERY_SESSION_CONFIRMED",
-      targetUserId: userSession.user.id,
       targetResource: "discovery_session",
+      targetUserId: userSession.user.id,
       metadata: {
         sessionId,
         skillsCreated,

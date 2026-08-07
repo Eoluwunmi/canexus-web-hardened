@@ -73,6 +73,7 @@ Rules:
 /**
  * Extract skills from experience narrative using Claude Sonnet.
  * Narrative can be combined with optional metadata about project type, team size, etc.
+ * Falls back to keyword extraction if Claude returns empty results.
  */
 export async function extractSkillsFromNarrative(
   narrative: string,
@@ -121,11 +122,104 @@ export async function extractSkillsFromNarrative(
       }))
       .filter((s: DiscoveredSkill) => s.skillName.length > 0);
 
+    // If Claude didn't extract any skills, fall back to keyword extraction
+    if (skills.length === 0) {
+      console.warn("Claude extraction returned 0 skills, using keyword fallback");
+      return extractSkillsFromKeywords(narrative);
+    }
+
     return skills;
   } catch (error) {
     console.error("Error extracting skills from narrative:", error);
-    throw error;
+    // Fall back to keyword extraction on error
+    return extractSkillsFromKeywords(narrative);
   }
+}
+
+/**
+ * Fallback skill extraction using keyword matching.
+ * Searches for common tech skills, soft skills, and tools in the narrative.
+ */
+function extractSkillsFromKeywords(narrative: string): DiscoveredSkill[] {
+  const textLower = narrative.toLowerCase();
+
+  const skillKeywords: Record<string, string[]> = {
+    // Programming Languages
+    Python: ["python"],
+    JavaScript: ["javascript", "js", "node", "nodejs"],
+    TypeScript: ["typescript", "ts"],
+    Java: ["java"],
+    "C++": ["c++", "cpp"],
+    "C#": ["c#", "csharp", "c sharp"],
+    PHP: ["php"],
+    Ruby: ["ruby"],
+    Go: ["golang", "go"],
+    Rust: ["rust"],
+    // Frontend
+    React: ["react", "reactjs"],
+    Vue: ["vue", "vuejs"],
+    Angular: ["angular"],
+    HTML: ["html"],
+    CSS: ["css"],
+    // Databases
+    PostgreSQL: ["postgresql", "postgres", "pg"],
+    MongoDB: ["mongodb", "mongo"],
+    MySQL: ["mysql"],
+    SQLite: ["sqlite"],
+    "Redis": ["redis"],
+    // Cloud/Ops
+    AWS: ["aws", "amazon web services"],
+    "Azure": ["azure"],
+    GCP: ["gcp", "google cloud"],
+    Docker: ["docker", "containerization"],
+    Kubernetes: ["kubernetes", "k8s"],
+    // Other Tech
+    Git: ["git", "github", "gitlab", "bitbucket"],
+    SQL: ["sql", "database"],
+    REST: ["rest", "restful", "api"],
+    GraphQL: ["graphql"],
+    // Soft Skills
+    Leadership: ["leadership", "led", "leader", "managed team"],
+    "Communication": ["communication", "communicated", "presented"],
+    "Project Management": ["project management", "managed project", "agile", "scrum"],
+    "Problem Solving": ["problem solving", "solved", "debugged"],
+    "Collaboration": ["collaboration", "collaborated", "teamwork", "cross-functional"],
+    Analytics: ["analytics", "analysis", "analyzed"],
+    "Data Analysis": ["data analysis", "data scientist", "business intelligence"],
+  };
+
+  const foundSkills: Map<string, DiscoveredSkill> = new Map();
+
+  for (const [skillName, keywords] of Object.entries(skillKeywords)) {
+    for (const keyword of keywords) {
+      if (textLower.includes(keyword)) {
+        if (!foundSkills.has(skillName)) {
+          // Find evidence snippet
+          const keywordIdx = textLower.indexOf(keyword);
+          let start = Math.max(0, keywordIdx - 50);
+          let end = Math.min(narrative.length, keywordIdx + keyword.length + 50);
+
+          // Adjust to sentence boundaries
+          const beforeDot = narrative.lastIndexOf(".", start);
+          if (beforeDot > 0) start = beforeDot + 1;
+          const afterDot = narrative.indexOf(".", end);
+          if (afterDot > 0) end = afterDot + 1;
+
+          const evidenceSnippet = narrative.substring(start, end).trim();
+
+          foundSkills.set(skillName, {
+            skillName,
+            proficiencyLevel: "INTERMEDIATE",
+            confidence: 0.7,
+            evidenceSnippet: evidenceSnippet || `Mentioned: ${keyword}`,
+          });
+        }
+        break;
+      }
+    }
+  }
+
+  return Array.from(foundSkills.values());
 }
 
 function validateProficiencyLevel(

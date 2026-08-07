@@ -68,6 +68,23 @@ export interface ParsedResume {
     years_experience: number | null;
     last_used_year: number | null;
   }>;
+  profile_analysis: {
+    hard_skills: Array<{
+      skill: string;
+      inferred: boolean;
+      source: string;
+    }>;
+    soft_skills: Array<{
+      skill: string;
+      inferred: boolean;
+      source: string;
+    }>;
+    competencies: string[]; // proven capabilities
+    domain_expertise: string[]; // industry knowledge
+    career_themes: string[]; // recurring patterns
+    unique_signals: string[]; // what makes this person distinct
+    key_strengths: string[]; // top differentiators
+  };
   certifications: Array<{
     name: string;
     issuer: string | null;
@@ -131,18 +148,25 @@ const client = new Anthropic();
 
 /**
  * Extraction prompt for Claude.
- * Instructs the model to parse resume text into structured JSON.
+ * Instructs the model to parse resume text into structured JSON with rich skill analysis.
  */
 function buildExtractionPrompt(rawText: string): string {
-  return `You are a resume parsing expert. Extract structured data from this resume text.
+  return `You are an expert resume analyst. Extract structured data AND produce a rich profile analysis.
 
-IMPORTANT RULES:
+GOAL: Create a unique profile that captures what makes this person distinct—not just list keywords.
+- Analyze achievements to infer hard skills (e.g., "grew organic traffic by 300%" → search engine optimization, growth analytics)
+- Identify soft skills demonstrated through roles (e.g., "led cross-functional teams" → leadership, collaboration)
+- Infer domain expertise and competencies from context
+- Capture career themes and patterns
+- Highlight unique strengths and what differentiates this person
+
+EXTRACTION RULES:
 1. Extract ONLY information explicitly stated in the text. Never invent data.
 2. For missing fields, use null (not empty string or 0).
 3. Dates must be in YYYY-MM format. If only year is given, use YYYY-01.
 4. Phones must be in E.164 format (e.g., +16135551234).
 5. For each field, include a confidence score (0-1) in the JSON.
-6. Mark inferred fields (e.g., "JavaScript" inferred from "Node.js") with "inferred": true.
+6. Mark inferred fields with "inferred": true and include reasoning.
 7. Keep arrays empty [] if no data found, not null.
 
 Resume text:
@@ -150,7 +174,16 @@ Resume text:
 ${rawText}
 ---
 
-Return ONLY valid JSON (no markdown, no explanations). Include field_confidence for each extracted field.
+ANALYSIS INSTRUCTIONS FOR SKILLS & COMPETENCIES:
+For each skill listed or inferred:
+- hard_skills: Technical skills explicitly mentioned OR inferred from achievements (e.g., "payment platform handling 10k transactions/sec" → distributed systems, high-throughput architecture)
+- soft_skills: Interpersonal/leadership skills demonstrated through roles (e.g., "mentored 3 junior developers" → technical mentorship, team development)
+- competencies: Specific proven capabilities derived from achievements (e.g., "scaled systems under heavy load", "driving measurable growth")
+- unique_signals: What differentiates this person (e.g., "thrives at intersection of high-performance engineering and team growth")
+- domain_expertise: Industry/domain knowledge demonstrated
+- career_themes: Recurring patterns across roles (e.g., "pattern: always chosen for scaling/growth roles")
+
+Return ONLY valid JSON (no markdown, no explanations).
 
 {
   "identity": {
@@ -172,7 +205,9 @@ Return ONLY valid JSON (no markdown, no explanations). Include field_confidence 
       "end": "YYYY-MM | 'present' | null",
       "is_current": false,
       "bullets": ["string"],
-      "technologies": ["string"]
+      "technologies": ["string"],
+      "achievements_quantified": ["string with metrics"],
+      "inferred_skills": ["skill names inferred from this role"]
     }
   ],
   "education": [
@@ -191,6 +226,37 @@ Return ONLY valid JSON (no markdown, no explanations). Include field_confidence 
       "inferred": false
     }
   ],
+  "profile_analysis": {
+    "hard_skills": [
+      {
+        "skill": "string (e.g., distributed systems, growth analytics)",
+        "inferred": true | false,
+        "source": "string (e.g., 'Built payment platform handling 10k TPS' or 'Listed: React')"
+      }
+    ],
+    "soft_skills": [
+      {
+        "skill": "string (e.g., technical leadership, cross-cultural communication)",
+        "inferred": true | false,
+        "source": "string (e.g., 'Led cross-functional teams' or 'Worked in 5 markets')"
+      }
+    ],
+    "competencies": [
+      "string (proven capabilities: 'proven ability to scale systems under heavy load')"
+    ],
+    "domain_expertise": [
+      "string (industry knowledge: 'financial technology', 'international marketing')"
+    ],
+    "career_themes": [
+      "string (patterns: 'consistently chosen for high-growth scaling roles', 'builds high-performing teams')"
+    ],
+    "unique_signals": [
+      "string (differentiators: 'blends data-driven rigor with creative storytelling', 'thrives at intersection of engineering and team growth')"
+    ],
+    "key_strengths": [
+      "string (top 3-5 differentiators based on resume pattern)"
+    ]
+  },
   "languages": [
     {
       "name": "string",
@@ -205,7 +271,8 @@ Return ONLY valid JSON (no markdown, no explanations). Include field_confidence 
   ],
   "field_confidence": {
     "identity.full_name": 0.95,
-    "identity.emails[0]": 0.98,
+    "experience[0].title": 0.98,
+    "profile_analysis.competencies": 0.88,
     ...
   },
   "overall_confidence": 0.92
@@ -320,6 +387,23 @@ export async function parseResumeWithLLM(
         years_experience: null,
         last_used_year: null,
       })),
+      profile_analysis: {
+        hard_skills: (extractedJson.profile_analysis?.hard_skills ?? []).map((hs: any) => ({
+          skill: hs.skill ?? "",
+          inferred: hs.inferred ?? false,
+          source: hs.source ?? "",
+        })),
+        soft_skills: (extractedJson.profile_analysis?.soft_skills ?? []).map((ss: any) => ({
+          skill: ss.skill ?? "",
+          inferred: ss.inferred ?? false,
+          source: ss.source ?? "",
+        })),
+        competencies: extractedJson.profile_analysis?.competencies ?? [],
+        domain_expertise: extractedJson.profile_analysis?.domain_expertise ?? [],
+        career_themes: extractedJson.profile_analysis?.career_themes ?? [],
+        unique_signals: extractedJson.profile_analysis?.unique_signals ?? [],
+        key_strengths: extractedJson.profile_analysis?.key_strengths ?? [],
+      },
       certifications: extractedJson.certifications ?? [],
       languages: extractedJson.languages ?? [],
       publications: extractedJson.publications ?? [],

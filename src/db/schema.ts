@@ -349,3 +349,76 @@ export const parseCosts = pgTable("parse_costs", {
   totalCostUsd: real("total_cost_usd").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+/** Skill discovery sessions: multi-step journey (quiz → narrative → extraction → confirmation).
+ *  Tracks user's discovery progress separately from manual passport entry (resumeParses).
+ *  Status tracks the current step: ACTIVE (in progress), COMPLETED (synced to passport), ABANDONED. */
+export const discoverySessionStatusEnum = pgEnum("discovery_session_status", [
+  "ACTIVE",
+  "COMPLETED",
+  "ABANDONED",
+]);
+
+export const discoverySessions = pgTable("discovery_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: discoverySessionStatusEnum("status").notNull().default("ACTIVE"),
+  targetOccupationId: uuid("target_occupation_id").references(() => occupations.id, { onDelete: "set null" }),
+  // Optional: Link to resume if user uploaded one during discovery
+  linkedResumeParseId: uuid("linked_resume_parse_id").references(() => resumeParses.id, { onDelete: "set null" }),
+  // Step 1: Quiz responses (JSONB stores answers like { "currentRole": "...", "yearsExp": 5, "interests": [...] })
+  quizResponses: jsonb("quiz_responses"),
+  // Step 2: Experience narrative + optional metadata (project type, timeline, team size, etc.)
+  narrativeContent: text("narrative_content"),
+  narrativeMetadata: jsonb("narrative_metadata"), // { projectType: "...", timeline: "...", teamSize: "...", ... }
+  // Step 3-4: Overall confidence of extraction + status
+  extractionConfidence: real("extraction_confidence"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+/** Skills discovered during a discovery session.
+ *  Stores extracted skills before confirmation (step 3 approval).
+ *  Once confirmed, skills are created in userSkills table with EVIDENCE_LINKED level. */
+export const discoverySkills = pgTable("discovery_skills", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sessionId: uuid("session_id").notNull().references(() => discoverySessions.id, { onDelete: "cascade" }),
+  skillId: uuid("skill_id").references(() => skills.id, { onDelete: "set null" }),
+  skillName: varchar("skill_name", { length: 150 }).notNull(), // Raw extracted skill name
+  proficiencyLevel: varchar("proficiency_level", { length: 50 }).notNull().default("INTERMEDIATE"), // BEGINNER, INTERMEDIATE, ADVANCED, EXPERT
+  confidence: real("confidence").notNull().default(0.5), // Claude's confidence (0-1)
+  evidenceSnippet: text("evidence_snippet"), // Exact quote from narrative supporting this skill
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** Lineage tracking: links userSkills to their origin (manual entry, discovery session, or resume parse).
+ *  Allows "Show where this skill came from" in passport UI without modifying userSkills schema.
+ *  Example: userSkillId=123, sourceType='DISCOVERED', sourceId=sessionId. */
+export const userSkillSources = pgTable(
+  "user_skill_sources",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userSkillId: uuid("user_skill_id").notNull().references(() => userSkills.id, { onDelete: "cascade" }),
+    sourceType: varchar("source_type", { length: 50 }).notNull(), // MANUAL, DISCOVERED, RESUME
+    sourceId: uuid("source_id"), // discoverySession.id or resumeParse.id (null for MANUAL)
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique().on(t.userSkillId)],
+);
+
+/** Gap analysis: cached matched/missing skills vs. target occupation for a discovery session.
+ *  Populated at step 4 to show user which required skills they have/lack for their target role.
+ *  Refreshed when user selects a new target occupation during discovery. */
+export const discoveryGapAnalysis = pgTable(
+  "discovery_gap_analysis",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id").notNull().references(() => discoverySessions.id, { onDelete: "cascade" }),
+    occupationId: uuid("occupation_id").notNull().references(() => occupations.id, { onDelete: "cascade" }),
+    matchedSkills: jsonb("matched_skills").notNull(), // Array of { skillName, importance }
+    gapSkills: jsonb("gap_skills").notNull(), // Array of { skillName, importance }
+    matchScore: real("match_score").notNull().default(0), // % of required skills user has
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique().on(t.sessionId, t.occupationId)],
+);

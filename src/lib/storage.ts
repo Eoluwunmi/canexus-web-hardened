@@ -2,6 +2,8 @@ import { S3Client, DeleteObjectCommand, HeadObjectCommand, GetObjectCommand } fr
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
+import { promises as fs } from "fs";
+import path from "path";
 
 // Volume 8 / SECURITY.md: Canadian region by default. S3_ENDPOINT is optional — set it to use
 // a non-AWS S3-compatible provider (Cloudflare R2, Backblaze B2, MinIO, DO Spaces); leave unset
@@ -20,8 +22,28 @@ function getS3Client(): S3Client {
 
 function getBucket(): string {
   const bucket = process.env.S3_BUCKET;
-  if (!bucket) throw new Error("S3_BUCKET is not configured — see .env.example");
+  if (!bucket) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("S3_BUCKET is not configured — see .env.example");
+    }
+    // Development fallback: use local file system
+    return "local-dev";
+  }
   return bucket;
+}
+
+function isUsingLocalStorage(): boolean {
+  return !process.env.S3_BUCKET && process.env.NODE_ENV !== "production";
+}
+
+async function ensureLocalStorageDir(dirPath: string): Promise<void> {
+  if (isUsingLocalStorage()) {
+    try {
+      await fs.mkdir(dirPath, { recursive: true });
+    } catch (error) {
+      console.warn("Could not create local storage directory:", error);
+    }
+  }
 }
 
 export const EVIDENCE_ALLOWED_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg"] as const;
@@ -109,8 +131,18 @@ export async function getEvidenceDownloadUrl(storageKey: string): Promise<string
 /**
  * Upload a resume file to S3 (server-side).
  * Used by resume parser upload API.
+ * Falls back to local file system in development if S3 is not configured.
  */
 export async function uploadToS3(key: string, buffer: Buffer, mimeType: string): Promise<void> {
+  if (isUsingLocalStorage()) {
+    const storageDir = path.join(process.cwd(), ".local-storage");
+    await ensureLocalStorageDir(storageDir);
+    const filePath = path.join(storageDir, key.replace(/\//g, "_"));
+    await fs.writeFile(filePath, buffer);
+    console.log(`[DEV] Stored file locally: ${filePath}`);
+    return;
+  }
+
   const { PutObjectCommand } = await import("@aws-sdk/client-s3");
   const client = getS3Client();
   await client.send(
@@ -126,8 +158,19 @@ export async function uploadToS3(key: string, buffer: Buffer, mimeType: string):
 /**
  * Download a file from S3.
  * Used by resume parser worker to retrieve uploaded resumes.
+ * Falls back to local file system in development if S3 is not configured.
  */
 export async function downloadFromS3(key: string): Promise<Buffer> {
+  if (isUsingLocalStorage()) {
+    const storageDir = path.join(process.cwd(), ".local-storage");
+    const filePath = path.join(storageDir, key.replace(/\//g, "_"));
+    try {
+      return await fs.readFile(filePath);
+    } catch (error) {
+      throw new Error(`Local storage file not found: ${filePath}`);
+    }
+  }
+
   const client = getS3Client();
   const response = await client.send(
     new GetObjectCommand({

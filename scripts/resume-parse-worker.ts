@@ -119,15 +119,20 @@ async function processParseJob(parseId: string, retryCount = 0) {
     });
 
     // Step 8: Audit log
-    await logAudit(resume.uploadedByUserId, "RESUME_PARSED", "resume_parse", {
-      parseId,
-      resumeId: resume.id,
-      extractionMethod: extraction.method,
-      pageCount: extraction.pageCount,
-      llmTimeMs,
-      overallConfidence,
-      status: finalStatus,
-      costUsd: totalCostUsd,
+    await logAudit({
+      actorUserId: resume.uploadedByUserId,
+      action: "RESUME_PARSED",
+      targetResource: "resume_parse",
+      metadata: {
+        parseId,
+        resumeId: resume.id,
+        extractionMethod: extraction.method,
+        pageCount: extraction.pageCount,
+        llmTimeMs,
+        overallConfidence,
+        status: finalStatus,
+        costUsd: totalCostUsd,
+      },
     });
 
     console.log(
@@ -163,17 +168,17 @@ async function processParseJob(parseId: string, retryCount = 0) {
     });
 
     if (resume) {
-      await logAudit(
-        resume.uploadedByUserId,
-        "RESUME_PARSE_FAILED",
-        "resume_parse",
-        {
+      await logAudit({
+        actorUserId: resume.uploadedByUserId,
+        action: "RESUME_PARSE_FAILED",
+        targetResource: "resume_parse",
+        metadata: {
           parseId,
           resumeId: resume.id,
           error: errorMsg,
           retries: MAX_RETRIES,
-        }
-      );
+        },
+      });
     }
   }
 }

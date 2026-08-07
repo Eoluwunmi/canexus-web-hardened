@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { resumes, resumeParses } from "@/db/schema";
 import { uploadToS3 } from "@/lib/storage";
 import { hashFile, extractResumeText } from "@/lib/resume-extraction";
+import { parseResumeWithLLM } from "@/lib/resume-llm";
 import { logAudit } from "@/lib/audit";
 import { eq } from "drizzle-orm";
 
@@ -57,9 +58,14 @@ export async function POST(request: Request) {
       });
 
       if (existingParse) {
-        await logAudit(session.user.id, "RESUME_DUPLICATE_UPLOADED", "resume", {
-          resumeId: existingParse.id,
-          fileName: file.name,
+        await logAudit({
+          actorUserId: session.user.id,
+          action: "RESUME_DUPLICATE_UPLOADED",
+          targetResource: "resume",
+          metadata: {
+            resumeId: existingParse.id,
+            fileName: file.name,
+          },
         });
 
         return Response.json(
@@ -95,7 +101,7 @@ export async function POST(request: Request) {
       throw new Error("Failed to create resume record");
     }
 
-    // Create parse record (status: PENDING)
+    // Create parse record (status: PENDING initially)
     const newParse = await db
       .insert(resumeParses)
       .values({
@@ -108,20 +114,96 @@ export async function POST(request: Request) {
       throw new Error("Failed to create parse record");
     }
 
-    // Queue for parsing (TODO: emit to job queue)
-    await logAudit(session.user.id, "RESUME_UPLOADED", "resume", {
-      resumeId: newResume[0].id,
-      parseId: newParse[0].id,
-      fileName: file.name,
+    // Parse resume immediately with LLM
+    try {
+      const extraction = await extractResumeText(buffer, fileExt);
+      const rawText = extraction.rawText;
+
+      let parsed;
+      if (process.env.ANTHROPIC_API_KEY) {
+        // Use Claude for advanced parsing if API key is available
+        parsed = await parseResumeWithLLM(
+          rawText,
+          newResume[0].id,
+          file.name,
+          fileHash,
+          extraction.pageCount
+        );
+      } else {
+        // Fallback: extract basic skills from resume text without LLM
+        const skillKeywords = ['javascript', 'typescript', 'python', 'react', 'node.js', 'express', 'postgresql', 'mongodb', 'aws', 'docker', 'git', 'sql', 'html', 'css', 'java', 'c++', 'php', 'ruby', 'go', 'rust', 'kubernetes', 'azure', 'gcp'];
+        const foundSkills = skillKeywords
+          .filter(skill => rawText.toLowerCase().includes(skill))
+          .map(name => ({
+            name,
+            canonical_id: null,
+            category: 'Technology',
+            evidence_span_ids: [],
+            inferred: false,
+            years_experience: null,
+            last_used_year: null,
+          }));
+
+        parsed = {
+          candidate_id: newResume[0].id,
+          source: { file_id: newResume[0].id, filename: file.name, sha256: fileHash, pages: extraction.pageCount, extraction_method: extraction.method },
+          identity: { full_name: null, given_name: null, family_name: null, emails: [], phones: [], location: { city: null, region: null, country: null, raw: null }, links: [] },
+          work_authorization: { stated: null, raw_text: null },
+          summary: rawText.substring(0, 500),
+          experience: [],
+          education: [],
+          skills: foundSkills,
+          certifications: [],
+          languages: [],
+          publications: [],
+          projects: [],
+          volunteer: [],
+          awards: [],
+          derived: { total_experience_months: 0, experience_by_skill: {}, employment_gaps: [], average_tenure_months: 0, career_trajectory: 'unknown' as const },
+          quality: { field_confidence: {}, overall_confidence: 0.5, needs_review: true, review_reasons: ['Using fallback skill extraction - configure ANTHROPIC_API_KEY for full parsing'] },
+        };
+      }
+
+      // Update parse record with results
+      await db
+        .update(resumeParses)
+        .set({
+          status: "COMPLETED",
+          extractedData: parsed,
+          parsedAt: new Date(),
+        })
+        .where(eq(resumeParses.id, newParse[0].id));
+    } catch (parseError) {
+      console.error("Resume parsing error:", parseError);
+      // Mark as failed but don't throw - user can still use upload without parsing
+      await db
+        .update(resumeParses)
+        .set({
+          status: "FAILED",
+          needsReview: true,
+          reviewReasons: `Parsing failed: ${String(parseError)}`,
+        })
+        .where(eq(resumeParses.id, newParse[0].id));
+    }
+
+    await logAudit({
+      actorUserId: session.user.id,
+      action: "RESUME_UPLOADED",
+      targetResource: "resume",
+      metadata: {
+        resumeId: newResume[0].id,
+        parseId: newParse[0].id,
+        fileName: file.name,
+      },
     });
 
     return Response.json(
       {
         parseId: newParse[0].id,
         resumeId: newResume[0].id,
-        status: "PENDING",
+        status: "COMPLETED",
         uploadedAt: newResume[0].uploadedAt,
-        message: "Resume uploaded and queued for parsing",
+        message: "Resume uploaded and parsed successfully",
       },
       { status: 201 }
     );

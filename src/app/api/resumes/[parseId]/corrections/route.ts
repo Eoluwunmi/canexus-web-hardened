@@ -19,22 +19,22 @@ const CorrectionSchema = z.object({
 
 export async function POST(
   request: Request,
-  { params }: { params: { parseId: string } }
+  { params }: { params: Promise<{ parseId: string }> }
 ) {
   try {
+    const { parseId } = await params;
     const session = await auth();
     if (!session?.user?.id) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { parseId } = params;
     const body = await request.json();
 
     // Validate
     const validation = CorrectionSchema.safeParse(body);
     if (!validation.success) {
       return Response.json(
-        { error: "Validation failed", details: validation.error.errors },
+        { error: "Validation failed", details: validation.error.flatten().fieldErrors },
         { status: 400 }
       );
     }

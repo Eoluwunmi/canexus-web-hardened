@@ -7,7 +7,7 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { resumes, resumeParses, users } from "@/db/schema";
-import { eq, and, gte, or } from "drizzle-orm";
+import { eq, and, gte, lte, or } from "drizzle-orm";
 
 export async function GET(request: Request) {
   try {
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       whereConditions.push(eq(resumeParses.needsReview, true));
     } else if (filter === "low_confidence") {
       whereConditions.push(gte(resumeParses.overallConfidence, 0));
-      whereConditions.push(gte(confidenceThreshold, resumeParses.overallConfidence));
+      whereConditions.push(lte(resumeParses.overallConfidence, confidenceThreshold));
     } else if (filter === "failed") {
       whereConditions.push(eq(resumeParses.status, "FAILED"));
     } else if (filter === "completed") {

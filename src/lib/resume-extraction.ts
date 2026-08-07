@@ -42,7 +42,9 @@ export async function extractFromPdf(
 
   try {
     // Try native extraction first (using pdfplumber via node-pdfplumber or pdf-parse)
+    // @ts-ignore - pdf-parse module lacks type definitions but is installed and functional
     const pdfParse = await import("pdf-parse");
+    // @ts-ignore - pdf-parse module lacks type definitions
     const data = await pdfParse(buffer);
 
     if (!data.text || data.text.trim().length < 100) {
@@ -110,7 +112,8 @@ export async function extractFromDocx(buffer: Buffer): Promise<ExtractionResult>
 
   try {
     const mammoth = await import("mammoth");
-    const result = await mammoth.extractRawText({ arrayBuffer: buffer.arrayBuffer() });
+    const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+    const result = await mammoth.extractRawText({ arrayBuffer });
 
     const tokens: ExtractedToken[] = [];
     const lines = result.value.split("\n");

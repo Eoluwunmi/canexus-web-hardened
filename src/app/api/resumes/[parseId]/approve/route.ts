@@ -26,22 +26,22 @@ const ApproveSchema = z.object({
 
 export async function POST(
   request: Request,
-  { params }: { params: { parseId: string } }
+  { params }: { params: Promise<{ parseId: string }> }
 ) {
   try {
+    const { parseId } = await params;
     const session = await auth();
     if (!session?.user?.id) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { parseId } = params;
     const body = await request.json();
 
     // Validate
     const validation = ApproveSchema.safeParse(body);
     if (!validation.success) {
       return Response.json(
-        { error: "Validation failed", details: validation.error.errors },
+        { error: "Validation failed", details: validation.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
@@ -145,10 +145,15 @@ export async function POST(
           // In a real system, you'd link it via evidenceFiles to the parsed skills
           // For MVP, we just log it to audit
 
-          await logAudit(session.user.id, "EXPERIENCE_SYNCED", "resume_sync", {
-            parseId,
-            resumeId: parse.resumeId,
-            experience: experienceText,
+          await logAudit({
+            actorUserId: session.user.id,
+            action: "EXPERIENCE_SYNCED",
+            targetResource: "resume_sync",
+            metadata: {
+              parseId,
+              resumeId: parse.resumeId,
+              experience: experienceText,
+            },
           });
 
           createdEvidence++;
@@ -167,19 +172,24 @@ export async function POST(
       .where(eq(resumeParses.id, parseId));
 
     // Step 4: Audit log approval
-    await logAudit(session.user.id, "RESUME_APPROVED_AND_SYNCED", "resume_parse", {
-      parseId,
-      resumeId: parse.resumeId,
-      applicantUserId,
-      skillsCreated: createdSkills,
-      experienceRecords: createdEvidence,
+    await logAudit({
+      actorUserId: session.user.id,
+      action: "RESUME_APPROVED_AND_SYNCED",
+      targetResource: "resume_parse",
+      targetUserId: applicantUserId,
+      metadata: {
+        parseId,
+        resumeId: parse.resumeId,
+        skillsCreated: createdSkills,
+        experienceRecords: createdEvidence,
+      },
     });
 
     return Response.json(
       {
         parseId,
         status: "COMPLETED",
-        skillsCreated,
+        skillsCreated: createdSkills,
         experienceRecords: createdEvidence,
         message: `Resume approved and synced to Skills Passport (${createdSkills} skills added)`,
       },

@@ -26,6 +26,19 @@ export default async function ApplicantOverview() {
         <p className="text-ink-soft mt-1">Here&apos;s where your career transition stands today.</p>
       </div>
 
+      {/* Skill Discovery CTA */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 space-y-4">
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold text-ink">Discover Your Skills</h2>
+          <p className="text-sm text-ink-soft">
+            Take a guided journey to uncover transferable skills from your experience. Perfect for career changers.
+          </p>
+        </div>
+        <Link href="/dashboard/applicant/discovery" className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition">
+          Start Discovery →
+        </Link>
+      </div>
+
       <div className="grid md:grid-cols-3 gap-5">
         <div className="paper-card rounded-lg p-5">
           <p className="text-xs font-mono uppercase tracking-wide text-ink-soft">Passport completeness</p>

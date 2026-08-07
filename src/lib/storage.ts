@@ -105,3 +105,48 @@ export async function getEvidenceDownloadUrl(storageKey: string): Promise<string
   const command = new GetObjectCommand({ Bucket: getBucket(), Key: storageKey });
   return getSignedUrl(client, command, { expiresIn: 60 * 5 }); // 5 minutes
 }
+
+/**
+ * Upload a resume file to S3 (server-side).
+ * Used by resume parser upload API.
+ */
+export async function uploadToS3(key: string, buffer: Buffer, mimeType: string): Promise<void> {
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const client = getS3Client();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: getBucket(),
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType,
+    })
+  );
+}
+
+/**
+ * Download a file from S3.
+ * Used by resume parser worker to retrieve uploaded resumes.
+ */
+export async function downloadFromS3(key: string): Promise<Buffer> {
+  const client = getS3Client();
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: getBucket(),
+      Key: key,
+    })
+  );
+
+  if (!response.Body) {
+    throw new Error(`No body in S3 response for key: ${key}`);
+  }
+
+  // Convert stream to buffer
+  const chunks: Buffer[] = [];
+  const body = response.Body as any;
+
+  for await (const chunk of body) {
+    chunks.push(chunk instanceof Buffer ? chunk : Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks);
+}

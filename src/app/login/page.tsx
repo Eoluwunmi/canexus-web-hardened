@@ -108,7 +108,12 @@ function LoginForm() {
               <input name="email" type="email" required className="w-full rounded-md border border-paper-dim bg-cream px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-mono uppercase tracking-wide text-ink-soft mb-1">Password</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-xs font-mono uppercase tracking-wide text-ink-soft">Password</label>
+                <Link href="/forgot-password" className="text-xs text-stamp underline hover:no-underline">
+                  Forgot?
+                </Link>
+              </div>
               <input name="password" type="password" required className="w-full rounded-md border border-paper-dim bg-cream px-3 py-2 text-sm" />
             </div>
             {error && <p className="text-sm text-stamp">{error}</p>}
